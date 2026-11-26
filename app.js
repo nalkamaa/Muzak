@@ -10,6 +10,7 @@ const CATS = [
   {id:'metalli', name:'Metalli', src:'rb', by:{tag:'metal'}, sub:'Metalliradioita ympäri maailmaa.'},
   {id:'jazz', name:'Jazz', src:'rb', by:{tag:'jazz'}, sub:'Jazz-radioasemia ympäri maailmaa.'},
   {id:'elektroninen', name:'Elektroninen', src:'rb', by:{tag:'electronic'}, sub:'Elektronista musiikkia soittavia asemia.'},
+  {id:'blues', name:'Blues', src:'rb', by:{tag:'blues'}, sub:'Blues-radioasemia ympäri maailmaa.'},
   {id:'klassinen', name:'Klassinen', src:'rb', by:{tag:'classical'}, sub:'Klassisen musiikin radioasemia.'},
   {id:'albumit', name:'Albumit', src:'ia', sub:'Vapaasti jaettavia albumeita Internet Archiven netlabel-kokoelmasta, suosituimmat ensin.'},
   {id:'suosikit', name:'Suosikit', src:'fav', sub:'Tallentamasi asemat ja albumit. Ne säilyvät tässä laitteessa ja selaimessa.'},
@@ -18,6 +19,8 @@ const CATS = [
 
 // Hengellinen ja uskonnollinen sisältö sekä puhekanavat suodatetaan pois nimen ja tagien perusteella.
 const SPIRITUAL = /christ|kristi|gospel|worship|church|kirkko|seurakun|bible|raamat|catholic|katoli|evangel|evankel|lutheran|luterilai|jesus|jeesus|\bgod\b|\bgud\b|jumala|praise|prayer|rukous|sermon|saarna|hymn|virsi|virret|psalm|messiah|herätys|hengelli|relig|spiritu|islam|quran|koran|sunnah|allah|nasheed|hindu|bhajan|bhakti|devotion|mantra|krishna|buddh|dharma|torah|jewish|chabad|adventist|pentecost|helluntai|baptist|ministr|faith|\bpray|gurbani|kirtan/i;
+// Venäläiset asemat: maa, kieli, tagit tai nimi.
+const RUSSIAN = /russia|russian|русск|росси|\bрф\b/i;
 const TALK = /\b(talk|news|uutiset|sports?|urheilu|podcast)\b/i;
 const canHls = !!document.createElement('audio').canPlayType('application/vnd.apple.mpegurl');
 
@@ -63,7 +66,8 @@ async function rb(path, params) {
 function okStation(s) {
   const text = `${s.name} ${s.tags}`;
   if (s.name.length > 60 || (s.name.match(/[-|,*]/g) || []).length > 4) return false;  // avainsanoilla täytetyt roskanimet
-  if (!https(s.url_resolved)) return false;           // http-streamit eivät soi https-sivulla
+  if (!https(s.url_resolved)) return false;
+  if (s.countrycode === 'RU' || RUSSIAN.test(`${s.name} ${s.tags} ${s.language} ${s.country}`)) return false;           // http-streamit eivät soi https-sivulla
   if (s.hls === 1 && !canHls) return false;
   if (SPIRITUAL.test(text) || TALK.test(s.tags)) return false;
   return true;
