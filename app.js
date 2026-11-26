@@ -11,6 +11,11 @@ const CATS = [
   {id:'jazz', name:'Jazz', src:'rb', by:{tag:'jazz'}, sub:'Jazz-radioasemia ympäri maailmaa.'},
   {id:'elektroninen', name:'Elektroninen', src:'rb', by:{tag:'electronic'}, sub:'Elektronista musiikkia soittavia asemia.'},
   {id:'blues', name:'Blues', src:'rb', by:{tag:'blues'}, sub:'Blues-radioasemia ympäri maailmaa.'},
+  {id:'hiphop', name:'Hip hop', src:'rb', by:{tag:'hip hop'}, sub:'Hip hop- ja rap-radioasemia.'},
+  {id:'reggae', name:'Reggae', src:'rb', by:{tag:'reggae'}, sub:'Reggae-radioasemia.'},
+  {id:'country', name:'Country', src:'rb', by:{tag:'country'}, sub:'Country-radioasemia.'},
+  {id:'ambient', name:'Ambient', src:'rb', by:{tag:'ambient'}, sub:'Rauhallista ambient-musiikkia.'},
+  {id:'80luku', name:'80-luku', src:'rb', by:{tag:'80s'}, sub:'1980-luvun hittejä soittavia asemia.'},
   {id:'klassinen', name:'Klassinen', src:'rb', by:{tag:'classical'}, sub:'Klassisen musiikin radioasemia.'},
   {id:'joulu', name:'Joulu', src:'rb', by:{multi:[{tag:'joulumusiikki'}, {name:'joulu'}, {tag:'christmas'}, {tag:'christmas music'}, {tag:'xmas'}, {tag:'weihnachten'}]}, sub:'Joulumusiikkia soittavia asemia, suomalaiset ensin.'},
   {id:'konsertit', name:'Konsertit', src:'ia', sub:'Konserttitallenteita Internet Archiven Live Music Archivesta. Bändit ovat antaneet luvan jakaa keikkojaan. Suosituimmat ensin.'},
@@ -306,6 +311,8 @@ function show(catId) {
   const sn = $('#subnav'); sn.hidden = !c.sub2;
   sn.querySelectorAll('a').forEach(a => { if (a.dataset.id === c.sub2) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   $('#artists').hidden = true; grid.hidden = false;
+  $('#random').hidden = c.src !== 'rb';
+  if (c.id === 'suomi') renderRecent(); else $('#recent').hidden = true;
   if (c.src === 'artists') { grid.replaceChildren(); moreBtn.hidden = true; showArtists(); return; }
   grid.replaceChildren(); statusEl.textContent = ''; moreBtn.hidden = true;
   if (c.src === 'fav') {
@@ -325,7 +332,9 @@ function show(catId) {
 
 // ---------- player ----------
 const audio = $('#audio'), bar = $('#player'), toggle = $('#ptoggle'), pfav = $('#pfav');
+const prevBtn = $('#pprev'), nextBtn = $('#pnext'), timerBtn = $('#ptimer'), vol = $('#pvol');
 let now = null, queue = [], qi = 0;
+const ms = 'mediaSession' in navigator ? navigator.mediaSession : null;
 
 function setPlayFav() {
   if (!now) return;
@@ -335,9 +344,12 @@ function setPlayFav() {
   pfav.setAttribute('aria-label', on ? 'Poista suosikeista' : 'Suosikiksi');
 }
 function setState(t) { $('#pstate').textContent = t; }
+function setMeta(title, artist) {
+  if (ms) ms.metadata = new MediaMetadata({title, artist: artist || 'Muzak', artwork: now?.item.thumb ? [{src: now.item.thumb}] : []});
+}
 
 function play(item, title, url, sub) {
-  now = {item};
+  now = {item, title, sub};
   bar.hidden = false; document.body.classList.add('playing');
   $('#pname').textContent = title;
   const img = $('#pimg');
@@ -346,35 +358,135 @@ function play(item, title, url, sub) {
   audio.src = url;
   setState('Yhdistetään…');
   audio.play().catch(() => setState('Ei toistu. Paina toistopainiketta tai kokeile toista asemaa.'));
-  now.sub = sub;
   setPlayFav();
-  if ('mediaSession' in navigator) {
-    navigator.mediaSession.metadata = new MediaMetadata({title, artist: sub || 'Muzak', artwork: item.thumb ? [{src: item.thumb}] : []});
+  const hasQ = queue.length > 1;
+  prevBtn.hidden = nextBtn.hidden = !hasQ;
+  if (hasQ) { prevBtn.disabled = qi === 0; nextBtn.disabled = qi + 1 >= queue.length; }
+  setMeta(title, sub);
+  if (ms) {
+    ms.setActionHandler('previoustrack', hasQ ? () => step(-1) : null);
+    ms.setActionHandler('nexttrack', hasQ ? () => step(1) : null);
   }
+  addRecent(item);
 }
 
 function playStation(it) {
   queue = []; play(it, it.title, it.url, 'Radio');
   rb(`/json/url/${it.id}`, {}).catch(() => {});      // Radio Browserin kuuntelulaskuri
+  startNowPlaying(it);
 }
 function playTrack(album, i) {
+  stopNowPlaying();
   qi = i; const t = queue[i];
   play(album, t.title, t.url, album.title);
   document.querySelectorAll('#tracks li').forEach((li, n) => li.classList.toggle('on', n === i));
 }
+function step(d) {
+  const i = qi + d;
+  if (now && i >= 0 && i < queue.length) playTrack(now.item, i);
+}
+prevBtn.addEventListener('click', () => step(-1));
+nextBtn.addEventListener('click', () => step(1));
 
-audio.addEventListener('playing', () => { bar.classList.remove('paused'); setState(queue.length ? now.sub : 'Suorana'); toggle.textContent = '❚❚'; toggle.setAttribute('aria-label', 'Tauko'); });
+audio.addEventListener('playing', () => {
+  bar.classList.remove('paused');
+  if (!(now && now.song)) setState(queue.length ? now.sub : 'Suorana');
+  toggle.textContent = '❚❚'; toggle.setAttribute('aria-label', 'Tauko');
+});
 audio.addEventListener('pause', () => { bar.classList.add('paused'); toggle.textContent = '▶'; toggle.setAttribute('aria-label', 'Toista'); });
 audio.addEventListener('waiting', () => setState('Puskuroidaan…'));
 audio.addEventListener('error', () => { if (audio.src) setState('Lähetys ei toistu nyt. Kokeile toista asemaa.'); });
 audio.addEventListener('ended', () => { if (queue.length && qi + 1 < queue.length) playTrack(now.item, qi + 1); });
-toggle.addEventListener('click', () => {
-  if (audio.paused) {
-    if (!queue.length && now) audio.src = now.item.url;   // radio: palaa suoraan lähetykseen
-    audio.play().catch(() => setState('Ei toistu.'));
-  } else audio.pause();
-});
+const resume = () => {
+  if (!queue.length && now) audio.src = now.item.url;   // radio: palaa suoraan lähetykseen
+  audio.play().catch(() => setState('Ei toistu.'));
+};
+toggle.addEventListener('click', () => { if (audio.paused) resume(); else audio.pause(); });
+if (ms) { ms.setActionHandler('play', resume); ms.setActionHandler('pause', () => audio.pause()); }
 pfav.addEventListener('click', () => { if (now) { toggleFav(now.item); setPlayFav(); } });
+
+// äänenvoimakkuus (puhelimissa laitteen omat näppäimet)
+const savedVol = parseFloat(localStorage.getItem('muzak-vol'));
+if (savedVol >= 0 && savedVol <= 1) { audio.volume = savedVol; vol.value = savedVol; }
+vol.addEventListener('input', () => { audio.volume = +vol.value; try { localStorage.setItem('muzak-vol', vol.value); } catch {} });
+
+// ---------- uniajastin ----------
+const SLEEP = [0, 15, 30, 60];
+let sleepIdx = 0, sleepEnd = 0, sleepTick = null;
+function setTimerLabel() {
+  if (!sleepEnd) { timerBtn.textContent = 'zZ'; timerBtn.setAttribute('aria-label', 'Uniajastin pois'); timerBtn.classList.remove('on'); return; }
+  const min = Math.max(1, Math.ceil((sleepEnd - Date.now()) / 60000));
+  timerBtn.textContent = `${min}′`; timerBtn.setAttribute('aria-label', `Uniajastin: ${min} min jäljellä`); timerBtn.classList.add('on');
+}
+timerBtn.addEventListener('click', () => {
+  sleepIdx = (sleepIdx + 1) % SLEEP.length;
+  clearInterval(sleepTick); sleepEnd = 0;
+  if (SLEEP[sleepIdx]) {
+    sleepEnd = Date.now() + SLEEP[sleepIdx] * 60000;
+    sleepTick = setInterval(() => {
+      const left = sleepEnd - Date.now();
+      if (left <= 0) {
+        clearInterval(sleepTick); sleepEnd = 0; sleepIdx = 0;
+        audio.pause(); audio.volume = +vol.value; setTimerLabel(); setState('Uniajastin pysäytti toiston');
+      } else {
+        if (left < 30000) audio.volume = +vol.value * left / 30000;   // hiljennys viimeisen 30 s aikana
+        setTimerLabel();
+      }
+    }, 1000);
+  } else audio.volume = +vol.value;
+  setTimerLabel();
+});
+setTimerLabel();
+
+// ---------- nyt soi (Icecast-asemat) ----------
+let npTimer = null;
+function stopNowPlaying() { clearTimeout(npTimer); npTimer = null; if (now) now.song = ''; }
+async function fetchSong(url) {
+  const u = new URL(url);
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 6000);
+  try {
+    const r = await fetch(`${u.origin}/status-json.xsl`, {signal: ctl.signal, cache: 'no-store'});
+    if (!r.ok) return '';
+    const src = [].concat((await r.json()).icestats?.source || []);
+    const s = src.find(x => x.listenurl && new URL(x.listenurl, u.origin).pathname === u.pathname) || (src.length === 1 ? src[0] : null);
+    if (!s) return '';
+    return plain(s.artist && s.title ? `${s.artist} – ${s.title}` : (s.title || s.yp_currently_playing || ''));
+  } catch { return ''; } finally { clearTimeout(t); }
+}
+function startNowPlaying(it) {
+  stopNowPlaying();
+  const poll = async () => {
+    const song = await fetchSong(it.url);
+    if (now?.item !== it) return;
+    if (song && song !== now.song) { now.song = song; setState('♪ ' + song); setMeta(it.title, song); }
+    npTimer = setTimeout(poll, song ? 20000 : 60000);
+  };
+  poll();
+}
+
+// ---------- viimeksi kuunnellut ----------
+const recent = {
+  get(){ try { return JSON.parse(localStorage.getItem('muzak-recent') || '[]'); } catch { return []; } },
+  set(v){ try { localStorage.setItem('muzak-recent', JSON.stringify(v)); } catch {} }
+};
+function addRecent(it) {
+  recent.set([it, ...recent.get().filter(x => x.key !== it.key)].slice(0, 12));
+  if (state.cat?.id === 'suomi') renderRecent();
+}
+function renderRecent() {
+  const box = $('#recent'), list = recent.get();
+  box.hidden = !list.length;
+  $('#recentrow').replaceChildren(...list.map(card));
+}
+$('#recentrow').addEventListener('click', e => onCardClick(e));
+
+// ---------- satunnainen asema ----------
+$('#random').addEventListener('click', () => {
+  const st = [...grid.querySelectorAll('.card.station')];
+  if (!st.length) return;
+  const it = items.get(st[Math.floor(Math.random() * st.length)].dataset.key);
+  if (it) playStation(it);
+});
 
 // ---------- album sheet ----------
 const dlg = $('#album'), afav = $('#afav');
@@ -415,14 +527,15 @@ async function showAlbum(it) {
 $('#aclose').addEventListener('click', () => dlg.close());
 afav.addEventListener('click', () => { toggleFav(openAlbum); setAlbumFav(); setPlayFav(); });
 
-grid.addEventListener('click', e => {
+grid.addEventListener('click', e => onCardClick(e));
+function onCardClick(e) {
   const st = e.target.closest('.star');
   if (st) { const it = items.get(st.dataset.key); if (it) toggleFav(it); return; }
   if (!e.target.closest('.open')) return;
   const b = e.target.closest('.card'); if (!b) return;
   const it = items.get(b.dataset.key); if (!it) return;
   if (it.src === 'rb') playStation(it); else showAlbum(it);
-});
+}
 moreBtn.addEventListener('click', load);
 
 // ---------- navigation ----------

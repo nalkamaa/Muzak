@@ -125,3 +125,16 @@ dialog button.ghost{color:#2a1a0c;border-color:#8a6a3a}
 .player button:not(.ghost){background:linear-gradient(180deg,#f4f7fb,#b9c5d6 48%,#8e9bb0 52%,#dde5ef);color:#10141b;border:1px solid #fff4;box-shadow:0 4px 14px #0008,inset 0 1px 0 #fff}
 .track{border:0;box-shadow:none;background:transparent;min-height:40px}
 .card.station .y{-webkit-line-clamp:1}
+
+/* player extras */
+.pvol{width:96px;accent-color:#c6d4ea;flex:none}
+@media(pointer:coarse),(max-width:600px){.pvol{display:none}}
+.ptimer{font-size:14px!important;font-weight:700}
+.ptimer.on{background:linear-gradient(180deg,#f4f7fb,#b9c5d6 48%,#8e9bb0 52%,#dde5ef)!important;color:#10141b!important}
+.player button:disabled{opacity:.4;cursor:default}
+@media(max-width:600px){.player{gap:6px;padding:6px}.player button{width:40px;min-height:40px;font-size:16px}.player img{width:40px;height:40px}}
+/* random + recent */
+.random{margin:0 0 20px}
+.recent{margin:0 0 28px}
+.recent h2{font:400 26px 'DM Serif Display',serif;color:#f3d08a;margin:0 0 10px}
+.recentrow{display:grid;grid-auto-flow:column;grid-auto-columns:150px;gap:14px;overflow-x:auto;padding-bottom:8px;scrollbar-width:thin}

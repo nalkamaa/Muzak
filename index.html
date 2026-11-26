@@ -36,6 +36,11 @@
       <a href="#esittajat" data-id="esittajat">Esittäjät A–Ö</a>
     </nav>
     <div id="artists" class="artists" hidden></div>
+    <button id="random" class="random" type="button" hidden>🎲 Satunnainen asema</button>
+    <section id="recent" class="recent" hidden>
+      <h2>Viimeksi kuunnellut</h2>
+      <div id="recentrow" class="recentrow"></div>
+    </section>
     <div id="grid" class="grid" aria-live="polite"></div>
     <p id="status" class="status"></p>
     <button id="more" class="more" hidden>Näytä lisää</button>
@@ -70,8 +75,12 @@
     <div id="pname" class="pname"></div>
     <div id="pstate" class="pstate"></div>
   </div>
+  <input id="pvol" class="pvol" type="range" min="0" max="1" step="0.05" value="1" aria-label="Äänenvoimakkuus">
+  <button id="ptimer" class="ghost ptimer" type="button" aria-label="Uniajastin pois">zZ</button>
   <button id="pfav" class="ghost" type="button" aria-pressed="false" aria-label="Suosikiksi">☆</button>
+  <button id="pprev" class="ghost" type="button" aria-label="Edellinen kappale" hidden>⏮</button>
   <button id="ptoggle" type="button" aria-label="Tauko">❚❚</button>
+  <button id="pnext" class="ghost" type="button" aria-label="Seuraava kappale" hidden>⏭</button>
   <audio id="audio" preload="none"></audio>
 </div>
 
