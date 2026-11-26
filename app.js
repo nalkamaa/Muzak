@@ -94,8 +94,10 @@ function okAlbum(d) {
   return !SPIRITUAL.test(`${plain(d.title)} ${plain(d.subject)} ${plain(d.creator)}`);
 }
 
-async function iaSearch({q, page}) {
+const quote = v => '"' + v.replace(/["\\]/g, ' ') + '"';
+async function iaSearch({q, page, creator}) {
   let query = 'mediatype:audio AND collection:netlabels';
+  if (creator) query += ` AND creator:(${quote(creator)})`;
   const t = terms(q);
   if (t.length) query += ` AND (${t.map(w => `(title:(${w}) OR subject:(${w}) OR creator:(${w}))`).join(' AND ')})`;
   const p = new URLSearchParams({q: query, rows: PAGE, page: page + 1, output: 'json'});
@@ -108,12 +110,74 @@ async function iaSearch({q, page}) {
   return {
     list: docs.filter(okAlbum).map(d => ({
       key: 'ia:' + d.identifier, src: 'ia', id: d.identifier,
-      title: plain(d.title) || d.identifier,
+      title: plain(d.title) || d.identifier, artist: plain([].concat(d.creator || [])[0]),
       thumb: `${IA}/services/img/${encodeURIComponent(d.identifier)}`,
       meta: [plain(d.creator), d.year ? String(d.year).slice(0, 4) : ''].filter(Boolean).join(' · ')
     })),
     done: (page + 1) * PAGE >= (j.response?.numFound || 0)
   };
+}
+
+// Esittäjälista kootaan 3000 suosituimman albumin tekijöistä.
+const VARIOUS = /^(various( artists)?|va|v\/a|v\.a\.|split|compilation|unknown|tuntematon)$/i;
+let artistCache = null;
+async function iaArtists() {
+  if (artistCache) return artistCache;
+  const p = new URLSearchParams({q: 'mediatype:audio AND collection:netlabels', rows: 3000, page: 1, output: 'json'});
+  ['creator','title','subject'].forEach(f => p.append('fl[]', f));
+  p.append('sort[]', 'downloads desc');
+  const r = await fetch(`${IA}/advancedsearch.php?${p}`);
+  if (!r.ok) throw new Error('Internet Archive ei vastannut');
+  const docs = (await r.json()).response?.docs || [];
+  const map = new Map();
+  for (const d of docs.filter(okAlbum)) {
+    for (const raw of [].concat(d.creator || [])) {
+      const name = plain(raw).replace(/\s+/g, ' ').trim();
+      if (!name || VARIOUS.test(name) || name.length > 60) continue;
+      const k = name.toLowerCase();
+      const a = map.get(k) || {name, n: 0}; a.n++; map.set(k, a);
+    }
+  }
+  artistCache = [...map.values()].sort((a, b) => a.name.localeCompare(b.name, 'fi', {sensitivity: 'base'}));
+  return artistCache;
+}
+
+function showArtists() {
+  const box = $('#artists'); box.hidden = false; grid.hidden = true;
+  statusEl.textContent = 'Ladataan esittäjiä…';
+  const tok = state.token;
+  iaArtists().then(list => {
+    if (tok !== state.token) return;
+    statusEl.textContent = '';
+    const first = n => { const c = n.name[0].toLocaleUpperCase('fi'); return /^[A-ZÅÄÖ]$/.test(c) ? c : '#'; };
+    const groups = new Map();
+    list.forEach(a => { const f = first(a); if (!groups.has(f)) groups.set(f, []); groups.get(f).push(a); });
+    const letters = [...groups.keys()].sort((a, b) => (a === '#') - (b === '#') || a.localeCompare(b, 'fi'));
+    const filter = document.createElement('input');
+    filter.type = 'search'; filter.placeholder = 'Suodata esittäjiä'; filter.className = 'afilter';
+    filter.setAttribute('aria-label', 'Suodata esittäjiä');
+    const jump = document.createElement('nav'); jump.className = 'letters'; jump.setAttribute('aria-label', 'Kirjaimet');
+    jump.innerHTML = letters.map(l => `<a href="#" data-l="${l}">${l}</a>`).join('');
+    const body = document.createElement('div');
+    body.innerHTML = letters.map(l => `<section class="agroup" id="kirjain-${encodeURIComponent(l)}"><h2>${l}</h2><ul class="alist">${
+      groups.get(l).map(a => `<li><a href="#esittaja=${encodeURIComponent(a.name)}"></a></li>`).join('')}</ul></section>`).join('');
+    // nimet tekstinä, ei HTML:nä
+    const flat = letters.flatMap(l => groups.get(l));
+    body.querySelectorAll('.alist a').forEach((el, i) => {
+      el.textContent = flat[i].name;
+      const n = document.createElement('span'); n.textContent = flat[i].n; el.append(n);
+    });
+    jump.addEventListener('click', e => {
+      const l = e.target.dataset.l; if (!l) return; e.preventDefault();
+      document.getElementById('kirjain-' + encodeURIComponent(l))?.scrollIntoView({behavior: 'smooth'});
+    });
+    filter.addEventListener('input', () => {
+      const f = filter.value.trim().toLowerCase();
+      body.querySelectorAll('.alist li').forEach(li => { li.hidden = f && !li.textContent.toLowerCase().includes(f); });
+      body.querySelectorAll('.agroup').forEach(g => { g.hidden = !g.querySelector('li:not([hidden])'); });
+    });
+    box.replaceChildren(filter, jump, body);
+  }).catch(() => { if (tok === state.token) statusEl.textContent = 'Esittäjien lataus epäonnistui. Yritä uudelleen.'; });
 }
 
 async function iaTracks(id) {
@@ -169,7 +233,7 @@ async function load() {
       if (a.status === 'rejected' && b.status === 'rejected') throw a.reason;
       state.done = state.rbDone && state.iaDone;
     } else {
-      const r = c.src === 'rb' ? await rbSearch({by: c.by, page: state.page}) : await iaSearch({q: '', page: state.page});
+      const r = c.src === 'rb' ? await rbSearch({by: c.by, page: state.page}) : await iaSearch({q: '', page: state.page, creator: c.creator});
       list = r.list; state.done = r.done;
     }
     if (tok !== state.token) return;
@@ -187,16 +251,26 @@ async function load() {
 }
 
 function show(catId) {
-  const c = catId === 'haku' ? {id:'haku', name:`Haku: ${state.q}`, sub:'Radioasemat nimen mukaan ja albumit Internet Archivesta.'}
-          : (CATS.find(x => x.id === catId) || CATS[0]);
+  let c;
+  if (catId === 'haku') c = {id:'haku', name:`Haku: ${state.q}`, sub:'Radioasemat nimen mukaan ja albumit Internet Archivesta.'};
+  else if (catId === 'esittajat') c = {id:'esittajat', tab:'albumit', sub2:'esittajat', src:'artists', name:'Esittäjät', sub:'Albumien esittäjät aakkosjärjestyksessä. Numero kertoo albumien määrän.'};
+  else if (catId.startsWith('esittaja=')) {
+    const name = decodeURIComponent(catId.slice(9));
+    c = {id:catId, tab:'albumit', sub2:'esittajat', src:'ia', creator:name, name, sub:'Esittäjän albumit Internet Archivesta.'};
+  } else c = CATS.find(x => x.id === catId) || CATS[0];
+  if (c.id === 'albumit') c = {...c, sub2:'albumit'};
   state = {...state, cat: c, page: 0, done: false, busy: false, rbDone: false, iaDone: false, token: state.token + 1};
   document.querySelectorAll('#tabs a').forEach(a => {
-    if (a.dataset.id === c.id) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    if (a.dataset.id === (c.tab || c.id)) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   });
   const links = c.src === 'links';
   $('#view').hidden = links; $('#linkit').hidden = !links;
   if (links) return;
   $('#heading').textContent = c.name; $('#sub').textContent = c.sub || '';
+  const sn = $('#subnav'); sn.hidden = !c.sub2;
+  sn.querySelectorAll('a').forEach(a => { if (a.dataset.id === c.sub2) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  $('#artists').hidden = true; grid.hidden = false;
+  if (c.src === 'artists') { grid.replaceChildren(); moreBtn.hidden = true; showArtists(); return; }
   grid.replaceChildren(); statusEl.textContent = ''; moreBtn.hidden = true;
   if (c.src === 'fav') {
     const f = store.get();
@@ -280,6 +354,11 @@ async function showAlbum(it) {
     albumTracks = tracks;
     const lic = meta.licenseurl ? ` · Lisenssi: ${meta.licenseurl.replace(/^https?:\/\/(www\.)?/, '')}` : '';
     $('#ameta').textContent = (it.meta || '') + lic;
+    if (it.artist && !VARIOUS.test(it.artist)) {
+      const a = document.createElement('a');
+      a.href = '#esittaja=' + encodeURIComponent(it.artist); a.textContent = 'Kaikki esittäjän albumit';
+      $('#ameta').append(' · ', a);
+    }
     ol.replaceChildren(...tracks.map((t, i) => {
       const li = document.createElement('li');
       const b = document.createElement('button'); b.type = 'button'; b.className = 'track';
@@ -314,7 +393,7 @@ const route = () => {
   if (h === 'haku' && !state.q) { location.hash = 'suomi'; return; }
   show(h || 'suomi');
 };
-window.addEventListener('hashchange', route);
+window.addEventListener('hashchange', () => { if (dlg.open) dlg.close(); route(); });
 route();
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
