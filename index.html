@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Muzak</title>
+<meta name="description" content="Ilmaista musiikkia ja nettiradiota laillisista avoimista lähteistä. Ei mainoksia, ei kirjautumista.">
+<meta name="theme-color" content="#1b1530">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Muzak">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;800&family=Inter:wght@400;600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="#suomi">Muzak</a>
+  <form id="search" class="search" role="search">
+    <label for="q" class="sr">Hae</label>
+    <input id="q" type="search" placeholder="Hae radioasemia ja albumeita" autocomplete="off">
+    <button type="submit">Hae</button>
+  </form>
+</header>
+
+<nav class="tabs" id="tabs" aria-label="Kanavat"></nav>
+
+<main>
+  <section class="band" id="view">
+    <h1 id="heading"></h1>
+    <p id="sub" class="sub"></p>
+    <div id="grid" class="grid" aria-live="polite"></div>
+    <p id="status" class="status"></p>
+    <button id="more" class="more" hidden>Näytä lisää</button>
+  </section>
+
+  <section class="band links" id="linkit" hidden>
+    <h1>Muut ilmaiset palvelut</h1>
+    <p class="sub">Nämä avautuvat omalla sivullaan. Ne ovat ilmaisia eivätkä vaadi kirjautumista.</p>
+    <ul class="linklist">
+      <li><a href="https://areena.yle.fi/audio" rel="noopener">Yle Areena, radio</a><span>Ylen radiokanavat ja musiikkiohjelmat suorana ja jälkikäteen.</span></li>
+      <li><a href="https://www.jamendo.com/" rel="noopener">Jamendo</a><span>Itsenäisten artistien vapaasti kuunneltavaa musiikkia.</span></li>
+      <li><a href="https://freemusicarchive.org/" rel="noopener">Free Music Archive</a><span>Laaja kokoelma Creative Commons -lisensoitua musiikkia.</span></li>
+      <li><a href="https://archive.org/details/audio" rel="noopener">Internet Archive</a><span>Koko ääniarkisto suoraan Archiven omalla sivulla.</span></li>
+      <li><a href="https://www.radio-browser.info/" rel="noopener">Radio Browser</a><span>Avoin hakemisto, josta tämän sivun radioasemat tulevat.</span></li>
+    </ul>
+  </section>
+</main>
+
+<dialog id="album" aria-labelledby="atitle">
+  <div class="pbar">
+    <h2 id="atitle"></h2>
+    <button id="afav" class="ghost" type="button" aria-pressed="false">Suosikiksi</button>
+    <button id="aclose" class="ghost" type="button">Sulje</button>
+  </div>
+  <p id="ameta" class="pmeta"></p>
+  <ol id="tracks" class="tracks"></ol>
+</dialog>
+
+<div class="player" id="player" hidden>
+  <img id="pimg" alt="">
+  <div class="pinfo">
+    <div id="pname" class="pname"></div>
+    <div id="pstate" class="pstate"></div>
+  </div>
+  <button id="pfav" class="ghost" type="button" aria-pressed="false" aria-label="Suosikiksi">☆</button>
+  <button id="ptoggle" type="button" aria-label="Tauko">❚❚</button>
+  <audio id="audio" preload="none"></audio>
+</div>
+
+<footer class="foot">
+  Radioasemat tulevat avoimesta Radio Browser -hakemistosta ja soivat suoraan asemien omilta palvelimilta. Albumit ovat Internet Archiven netlabel-kokoelmasta, jossa musiikki on julkaistu vapaasti jaettavaksi. Hengelliset kanavat on suodatettu pois.
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
