@@ -39,7 +39,8 @@ const toggleFav = it => {
   let f = store.get();
   if (isFav(it.key)) f = f.filter(x => x.key !== it.key); else f.unshift(it);
   store.set(f);
-  if (state.cat?.src === 'fav') show('suosikit');
+  if (state.cat?.src === 'fav') show('suosikit'); else syncStars();
+  setPlayFav?.();
 };
 
 const plain = html => {
@@ -215,10 +216,22 @@ async function iaTracks(id) {
 }
 
 // ---------- rendering ----------
+function syncStars() {
+  document.querySelectorAll('.star[data-key]').forEach(st => {
+    const on = isFav(st.dataset.key);
+    st.textContent = on ? '★' : '☆'; st.setAttribute('aria-pressed', on);
+    st.setAttribute('aria-label', on ? 'Poista suosikeista' : 'Lisää suosikkeihin');
+  });
+}
 function card(it) {
   items.set(it.key, it);
+  const wrap = document.createElement('div');
+  wrap.className = 'card' + (it.src === 'rb' ? ' station' : ''); wrap.dataset.key = it.key;
   const b = document.createElement('button');
-  b.className = 'card' + (it.src === 'rb' ? ' station' : ''); b.type = 'button'; b.dataset.key = it.key;
+  b.className = 'open'; b.type = 'button';
+  b.setAttribute('aria-label', (it.src === 'rb' ? 'Soita ' : 'Avaa albumi ') + it.title);
+  const star = document.createElement('button');
+  star.type = 'button'; star.className = 'star'; star.dataset.key = it.key;
   const ph = document.createElement('span'); ph.className = 'cover';
   if (it.thumb) {
     const img = document.createElement('img');
@@ -230,7 +243,11 @@ function card(it) {
   const y = document.createElement('span'); y.className = 'y';
   y.textContent = it.meta || (it.src === 'ia' ? 'Albumi' : 'Radio');
   b.append(ph, t, y);
-  return b;
+  wrap.append(b, star);
+  const on = isFav(it.key);
+  star.textContent = on ? '★' : '☆'; star.setAttribute('aria-pressed', on);
+  star.setAttribute('aria-label', on ? 'Poista suosikeista' : 'Lisää suosikkeihin');
+  return wrap;
 }
 const addCards = list => grid.append(...list.map(card));
 
@@ -255,7 +272,7 @@ async function load() {
     }
     if (tok !== state.token) return;
     state.page++;
-    addCards(list.filter(it => !grid.querySelector(`[data-key="${CSS.escape(it.key)}"]`)));
+    addCards(list.filter(it => !grid.querySelector(`.card[data-key="${CSS.escape(it.key)}"]`)));
     statusEl.textContent = grid.children.length ? '' : 'Ei tuloksia. Kokeile toista hakusanaa.';
     moreBtn.hidden = state.done;
   } catch (e) {
@@ -290,9 +307,15 @@ function show(catId) {
   if (c.src === 'artists') { grid.replaceChildren(); moreBtn.hidden = true; showArtists(); return; }
   grid.replaceChildren(); statusEl.textContent = ''; moreBtn.hidden = true;
   if (c.src === 'fav') {
-    const f = store.get();
-    addCards(f); state.done = true;
-    statusEl.textContent = f.length ? '' : 'Ei vielä suosikkeja. Paina tähteä soittimessa tai albumin Suosikiksi-painiketta.';
+    const f = store.get(); state.done = true;
+    for (const [src, title] of [['rb', 'Radioasemat'], ['ia', 'Albumit']]) {
+      const list = f.filter(x => x.src === src);
+      const h = document.createElement('h2'); h.className = 'ghead';
+      h.textContent = `${title} (${list.length})`;
+      grid.append(h);
+      if (list.length) addCards(list);
+      else { const e = document.createElement('p'); e.className = 'gempty'; e.textContent = src === 'rb' ? 'Ei vielä suosikkiasemia. Paina tähteä aseman kortissa.' : 'Ei vielä suosikkialbumeita. Paina tähteä albumin kortissa.'; grid.append(e); }
+    }
     return;
   }
   load();
@@ -338,8 +361,8 @@ function playTrack(album, i) {
   document.querySelectorAll('#tracks li').forEach((li, n) => li.classList.toggle('on', n === i));
 }
 
-audio.addEventListener('playing', () => { setState(queue.length ? now.sub : 'Suorana'); toggle.textContent = '❚❚'; toggle.setAttribute('aria-label', 'Tauko'); });
-audio.addEventListener('pause', () => { toggle.textContent = '▶'; toggle.setAttribute('aria-label', 'Toista'); });
+audio.addEventListener('playing', () => { bar.classList.remove('paused'); setState(queue.length ? now.sub : 'Suorana'); toggle.textContent = '❚❚'; toggle.setAttribute('aria-label', 'Tauko'); });
+audio.addEventListener('pause', () => { bar.classList.add('paused'); toggle.textContent = '▶'; toggle.setAttribute('aria-label', 'Toista'); });
 audio.addEventListener('waiting', () => setState('Puskuroidaan…'));
 audio.addEventListener('error', () => { if (audio.src) setState('Lähetys ei toistu nyt. Kokeile toista asemaa.'); });
 audio.addEventListener('ended', () => { if (queue.length && qi + 1 < queue.length) playTrack(now.item, qi + 1); });
@@ -391,6 +414,9 @@ $('#aclose').addEventListener('click', () => dlg.close());
 afav.addEventListener('click', () => { toggleFav(openAlbum); setAlbumFav(); setPlayFav(); });
 
 grid.addEventListener('click', e => {
+  const st = e.target.closest('.star');
+  if (st) { const it = items.get(st.dataset.key); if (it) toggleFav(it); return; }
+  if (!e.target.closest('.open')) return;
   const b = e.target.closest('.card'); if (!b) return;
   const it = items.get(b.dataset.key); if (!it) return;
   if (it.src === 'rb') playStation(it); else showAlbum(it);

@@ -1,6 +1,6 @@
-/* VOICE: late-night radio, warm and unhurried
-   COLOUR/TYPE: deep violet ground, warm paper text, amber accent; Archivo + Inter
-   LAYOUT: sticky search, scrolling channel tabs, cover grid, player bar that stays at the bottom */
+/* VOICE: a 1970s hi-fi receiver in a warm living room
+   COLOUR/TYPE: walnut wood, brass, glowing amber dial text; DM Serif Display + IBM Plex Mono + Inter
+   LAYOUT: sticky search, dial-style channel strip, paper-label cover cards, floating chrome capsule player */
 :root{color-scheme:dark;--bg:#1b1530;--bg2:#251d40;--card:#2f2650;--ink:#f4eee2;--mute:#bdb6cc;--acc:#ffb347;--line:#3a3060}
 *{box-sizing:border-box;min-width:0}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Inter,system-ui,sans-serif;overflow-x:clip;padding-bottom:env(safe-area-inset-bottom)}
@@ -72,3 +72,56 @@ dialog::backdrop{background:rgba(10,6,20,.8)}
 .alist a:hover{color:var(--acc)}
 .alist span{color:var(--mute);font-size:13px}
 .pmeta a{color:var(--acc)}
+
+/* ---------- Hi-Fi theme ---------- */
+:root{--bg:#1a120c;--bg2:#2a1d14;--card:#f1e6d2;--ink:#f6ead6;--mute:#c9b69a;--acc:#e8a33d;--line:#4a3424}
+body{background:#1a120c repeating-linear-gradient(90deg,#20160f 0 3px,#1a120c 3px 7px)}
+.top{background:linear-gradient(#5a3a22,#3b2615);border-bottom:4px solid #8a6a3a;box-shadow:inset 0 -2px 0 #c9a45a}
+.brand{font-family:'DM Serif Display',serif;font-size:30px;color:#f3d08a;text-shadow:0 0 12px #e8a33d88}
+.search input{background:#120c08;border:2px solid #8a6a3a;color:#f3d08a;font-family:'IBM Plex Mono',monospace;box-shadow:inset 0 2px 6px #000}
+button{background:linear-gradient(#e9cf8c,#b08a3c);color:#2a1a08;border:1px solid #6b4f22;box-shadow:0 2px 0 #4a3418,inset 0 1px 0 #fff6}
+.tabs{background:#0f0a06;border-top:2px solid #8a6a3a;border-bottom:2px solid #8a6a3a;box-shadow:inset 0 0 30px #e8a33d22}
+.tabs a{background:transparent;color:#c9b69a;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.08em;border-radius:4px}
+.tabs a[aria-current=page]{background:transparent;color:#ffcf6b;text-shadow:0 0 10px #ffb02e;box-shadow:inset 0 -3px 0 #ff7a1a}
+h1{font-family:'DM Serif Display',serif;font-weight:400;color:#f3d08a}
+.card{background:linear-gradient(#f4ead7,#e4d4b6);color:#2a1a0c;border-radius:6px;box-shadow:0 6px 0 #0006,0 0 0 1px #8a6a3a}
+.card .y{color:#6b5640}
+.card .cover{background-color:#2a1d14;border-bottom:3px solid #8a6a3a}
+.foot{font-family:'IBM Plex Mono',monospace}
+
+.player{left:50%;right:auto;transform:translateX(-50%);width:min(720px,94vw);bottom:14px;border-radius:999px;background:linear-gradient(180deg,#2a3140,#11151d);border:1px solid #4a5670;box-shadow:0 20px 50px #000a,inset 0 1px 0 #ffffff26;padding:8px 8px 8px 8px}
+.player img{border-radius:50%}
+
+/* chrome capsule player */
+.player button{border-radius:50%}
+.pname{color:#eef2f7}.pstate{color:#9aa4b5}
+.player .ghost{background:transparent;color:#eef2f7;border:1px solid #4a5670}
+@media(prefers-reduced-motion:no-preference){.player img{animation:spin 6s linear infinite}.player.paused img{animation-play-state:paused}}
+@keyframes spin{to{transform:rotate(360deg)}}
+body.playing{padding-bottom:calc(100px + env(safe-area-inset-bottom))}
+/* cards with star */
+.card{position:relative;display:block;padding:0}
+.card .open{display:flex;flex-direction:column;width:100%;height:100%;text-align:left;background:none;border:0;border-radius:inherit;padding:0;color:inherit;font-weight:400;min-height:0;box-shadow:none}
+.card .open:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.star{position:absolute;top:8px;right:8px;width:40px;height:40px;min-height:40px;padding:0;border-radius:50%;font-size:20px;line-height:1;background:rgba(20,13,8,.72);color:#ffcf6b;border:1px solid #8a6a3a;box-shadow:0 2px 6px #0008;backdrop-filter:blur(4px)}
+.star[aria-pressed=true]{background:linear-gradient(#e9cf8c,#b08a3c);color:#2a1a08;text-shadow:none}
+.ghead{grid-column:1/-1;font:400 28px 'DM Serif Display',serif;color:#f3d08a;margin:10px 0 0}
+.ghead:not(:first-child){margin-top:28px}
+.gempty{grid-column:1/-1;color:var(--mute);margin:0}
+.tracks li.on .tt{color:#b5621a}
+dialog{background:#f1e6d2;color:#2a1a0c}
+dialog .pbar{background:#f1e6d2}
+dialog .pbar h2{font-family:'DM Serif Display',serif;font-weight:400}
+dialog .pmeta,.track .tl,.track::before{color:#6b5640}
+dialog .pmeta a{color:#9a5a12}
+.track{color:#2a1a0c}.track:hover,.tracks li.on .track{background:#e4d4b6}
+dialog button.ghost{color:#2a1a0c;border-color:#8a6a3a}
+.subnav a[aria-current=page]{border-color:#ff7a1a}
+.letters{background:#1a120c}
+.letters a{background:#2a1d14;color:#c9b69a}
+.agroup h2{font-family:'DM Serif Display',serif;font-weight:400;color:#f3d08a}
+.alist a:hover{color:#ffcf6b}
+.player{font-family:'Space Grotesk',Inter,sans-serif}
+.player button:not(.ghost){background:linear-gradient(180deg,#f4f7fb,#b9c5d6 48%,#8e9bb0 52%,#dde5ef);color:#10141b;border:1px solid #fff4;box-shadow:0 4px 14px #0008,inset 0 1px 0 #fff}
+.track{border:0;box-shadow:none;background:transparent;min-height:40px}
+.card.station .y{-webkit-line-clamp:1}
