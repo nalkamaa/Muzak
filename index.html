@@ -20,7 +20,7 @@
   <a class="brand" href="#suomi">Muzak</a>
   <form id="search" class="search" role="search">
     <label for="q" class="sr">Hae</label>
-    <input id="q" type="search" placeholder="Hae radioasemia ja konsertteja" autocomplete="off">
+    <input id="q" type="search" placeholder="Hae asemia, konsertteja ja kirjoja" autocomplete="off">
     <button type="submit">Hae</button>
   </form>
 </header>
@@ -31,10 +31,11 @@
   <section class="band" id="view">
     <h1 id="heading"></h1>
     <p id="sub" class="sub"></p>
-    <nav id="subnav" class="subnav" aria-label="Konsertit" hidden>
-      <a href="#konsertit" data-id="konsertit">Suosituimmat</a>
-      <a href="#esittajat" data-id="esittajat">Esittäjät A–Ö</a>
-    </nav>
+    <nav id="subnav" class="subnav" aria-label="Alasivut" hidden></nav>
+    <section id="progress" class="recent" hidden>
+      <h2>Kesken olevat</h2>
+      <div id="progressrow" class="recentrow"></div>
+    </section>
     <div id="artists" class="artists" hidden></div>
     <button id="random" class="random" type="button" hidden>🎲 Satunnainen asema</button>
     <section id="recent" class="recent" hidden>
@@ -54,6 +55,7 @@
       <li><a href="https://www.jamendo.com/" rel="noopener">Jamendo</a><span>Itsenäisten artistien vapaasti kuunneltavaa musiikkia.</span></li>
       <li><a href="https://freemusicarchive.org/" rel="noopener">Free Music Archive</a><span>Laaja kokoelma Creative Commons -lisensoitua musiikkia.</span></li>
       <li><a href="https://archive.org/details/etree" rel="noopener">Live Music Archive</a><span>Kaikki konserttitallenteet suoraan Internet Archiven omalla sivulla.</span></li>
+      <li><a href="https://librivox.org/" rel="noopener">LibriVox</a><span>Kaikki LibriVoxin äänikirjat, yli 20 000 nimikettä monella kielellä.</span></li>
       <li><a href="https://www.radio-browser.info/" rel="noopener">Radio Browser</a><span>Avoin hakemisto, josta tämän sivun radioasemat tulevat.</span></li>
     </ul>
   </section>
@@ -78,6 +80,7 @@
   <input id="pvol" class="pvol" type="range" min="0" max="1" step="0.05" value="1" aria-label="Äänenvoimakkuus">
   <button id="ptimer" class="ghost ptimer" type="button" aria-label="Uniajastin pois">zZ</button>
   <button id="pfav" class="ghost" type="button" aria-pressed="false" aria-label="Suosikiksi">☆</button>
+  <button id="pspeed" class="ghost ptimer" type="button" aria-label="Toistonopeus 1×" hidden>1×</button>
   <button id="pprev" class="ghost" type="button" aria-label="Edellinen kappale" hidden>⏮</button>
   <button id="ptoggle" type="button" aria-label="Tauko">❚❚</button>
   <button id="pnext" class="ghost" type="button" aria-label="Seuraava kappale" hidden>⏭</button>
@@ -85,7 +88,7 @@
 </div>
 
 <footer class="foot">
-  Radioasemat tulevat avoimesta Radio Browser -hakemistosta ja soivat suoraan asemien omilta palvelimilta. Konsertit ovat Internet Archiven Live Music Archivesta, jossa bändit ovat antaneet luvan jakaa keikkatallenteitaan. Hengelliset ja venäläiset kanavat on suodatettu pois.
+  Radioasemat tulevat avoimesta Radio Browser -hakemistosta ja soivat suoraan asemien omilta palvelimilta. Konsertit ovat Internet Archiven Live Music Archivesta, jossa bändit ovat antaneet luvan jakaa keikkatallenteitaan. Äänikirjat ovat LibriVoxista, jossa vapaaehtoiset lukevat tekijänoikeusvapaita kirjoja. Hengelliset ja venäläiset kanavat on suodatettu pois.
 </footer>
 
 <script src="app.js"></script>

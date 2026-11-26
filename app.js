@@ -19,7 +19,8 @@ const CATS = [
   {id:'klassinen', name:'Klassinen', src:'rb', by:{tag:'classical'}, sub:'Klassisen musiikin radioasemia.'},
   {id:'joulu', name:'Joulu', src:'rb', by:{multi:[{tag:'joulumusiikki'}, {name:'joulu'}, {tag:'christmas'}, {tag:'christmas music'}, {tag:'xmas'}, {tag:'weihnachten'}]}, sub:'Joulumusiikkia soittavia asemia, suomalaiset ensin.'},
   {id:'konsertit', name:'Konsertit', src:'ia', sub:'Konserttitallenteita Internet Archiven Live Music Archivesta. Bändit ovat antaneet luvan jakaa keikkojaan. Suosituimmat ensin.'},
-  {id:'suosikit', name:'Suosikit', src:'fav', sub:'Tallentamasi asemat ja konsertit. Ne säilyvät tässä laitteessa ja selaimessa.'},
+  {id:'aanikirjat', name:'Äänikirjat', src:'ia', kind:'book', sub:'Tekijänoikeusvapaita äänikirjoja LibriVoxista, vapaaehtoisten lukemina. Muzak muistaa, mihin kohtaan jäit.'},
+  {id:'suosikit', name:'Suosikit', src:'fav', sub:'Tallentamasi asemat, konsertit ja äänikirjat. Ne säilyvät tässä laitteessa ja selaimessa.'},
   {id:'linkit', name:'Muut palvelut', src:'links'}
 ];
 
@@ -119,8 +120,10 @@ function okAlbum(d) {
 
 const GENERIC = new Set(['etree', 'stream_only', 'audio', 'opensource_audio', 'fav-archiveteam']);
 const band = d => [].concat(d.collection || []).find(c => !GENERIC.has(c) && !c.startsWith('fav-')) || '';
-async function iaSearch({q, page, artist}) {
-  let query = 'collection:etree AND mediatype:etree';
+async function iaSearch({q, page, artist, kind, lang}) {
+  const book = kind === 'book';
+  let query = book ? 'collection:librivoxaudio AND mediatype:audio' : 'collection:etree AND mediatype:etree';
+  if (book && lang) query += ' AND language:(fin OR fi OR finnish OR suomi)';
   if (artist) query += ` AND collection:(${artist.replace(/[^\w.-]/g, '')})`;
   const t = terms(q);
   if (t.length) query += ` AND (${t.map(w => `(title:(${w}) OR subject:(${w}) OR creator:(${w}))`).join(' AND ')})`;
@@ -132,8 +135,14 @@ async function iaSearch({q, page, artist}) {
   const j = await r.json();
   const docs = j.response?.docs || [];
   return {
-    list: docs.filter(okAlbum).map(d => ({
-      key: 'ia:' + d.identifier, src: 'ia', id: d.identifier,
+    list: docs.filter(okAlbum).map(d => book ? {
+      key: 'ia:' + d.identifier, src: 'ia', kind: 'book', id: d.identifier,
+      title: plain(d.title).replace(/\s*\(?librivox\)?\s*$/i, '') || d.identifier,
+      artist: plain([].concat(d.creator || [])[0]),
+      thumb: `${IA}/services/img/${encodeURIComponent(d.identifier)}`,
+      meta: plain([].concat(d.creator || [])[0])
+    } : ({
+      key: 'ia:' + d.identifier, src: 'ia', kind: 'live', id: d.identifier,
       title: plain(d.title).replace(/\s+on \d{4}-\d\d-\d\d$/, '') || d.identifier,
       artist: plain([].concat(d.creator || [])[0]), artistId: band(d),
       thumb: `${IA}/services/img/${encodeURIComponent(band(d) || d.identifier)}`,
@@ -197,18 +206,23 @@ function showArtists() {
   }).catch(() => { if (tok === state.token) statusEl.textContent = 'Esittäjien lataus epäonnistui. Yritä uudelleen.'; });
 }
 
-async function iaTracks(id) {
+const secs = v => {
+  if (typeof v === 'string' && v.includes(':')) return v.split(':').reduce((a, x) => a * 60 + (+x || 0), 0);
+  return +v || 0;
+};
+async function iaTracks(id, kind) {
   const r = await fetch(`${IA}/metadata/${encodeURIComponent(id)}`);
   if (!r.ok) throw new Error('Internet Archive ei vastannut');
   const j = await r.json();
   const files = j.files || [];
-  let mp3 = files.filter(f => f.format === 'VBR MP3');
+  let mp3 = files.filter(f => f.format === (kind === 'book' ? '64Kbps MP3' : 'VBR MP3'));
+  if (!mp3.length) mp3 = files.filter(f => f.format === 'VBR MP3');
   if (!mp3.length) mp3 = files.filter(f => /mp3/i.test(f.format || ''));
   return {
     meta: j.metadata || {},
     tracks: mp3.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true})).map(f => ({
       title: f.title || f.name.replace(/\.mp3$/i, '').replace(/_/g, ' '),
-      len: +f.length || 0,
+      len: secs(f.length),
       url: `${IA}/download/${encodeURIComponent(id)}/${f.name.split('/').map(encodeURIComponent).join('/')}`
     }))
   };
@@ -225,10 +239,10 @@ function syncStars() {
 function card(it) {
   items.set(it.key, it);
   const wrap = document.createElement('div');
-  wrap.className = 'card' + (it.src === 'rb' ? ' station' : ''); wrap.dataset.key = it.key;
+  wrap.className = 'card' + (it.src === 'rb' ? ' station' : it.kind === 'book' ? ' book' : ''); wrap.dataset.key = it.key;
   const b = document.createElement('button');
   b.className = 'open'; b.type = 'button';
-  b.setAttribute('aria-label', (it.src === 'rb' ? 'Soita ' : 'Avaa konsertti ') + it.title);
+  b.setAttribute('aria-label', (it.src === 'rb' ? 'Soita ' : it.kind === 'book' ? 'Avaa äänikirja ' : 'Avaa konsertti ') + it.title);
   const star = document.createElement('button');
   star.type = 'button'; star.className = 'star'; star.dataset.key = it.key;
   const ph = document.createElement('span'); ph.className = 'cover';
@@ -240,7 +254,7 @@ function card(it) {
   }
   const t = document.createElement('span'); t.className = 't'; t.textContent = it.title;
   const y = document.createElement('span'); y.className = 'y';
-  y.textContent = it.meta || (it.src === 'ia' ? 'Konsertti' : 'Radio');
+  y.textContent = it.meta || (it.src === 'rb' ? 'Radio' : it.kind === 'book' ? 'Äänikirja' : 'Konsertti');
   b.append(ph, t, y);
   wrap.append(b, star);
   const on = isFav(it.key);
@@ -257,16 +271,19 @@ async function load() {
   try {
     let list = [];
     if (c.id === 'haku') {
-      const [a, b] = await Promise.allSettled([
-        state.rbDone ? Promise.resolve({list: [], done: true}) : rbSearch({q: state.q, page: state.page}),
-        state.iaDone ? Promise.resolve({list: [], done: true}) : iaSearch({q: state.q, page: state.page})
+      const none = Promise.resolve({list: [], done: true});
+      const [a, b, k] = await Promise.allSettled([
+        state.rbDone ? none : rbSearch({q: state.q, page: state.page}),
+        state.iaDone ? none : iaSearch({q: state.q, page: state.page}),
+        state.bkDone ? none : iaSearch({q: state.q, page: state.page, kind: 'book'})
       ]);
       if (a.status === 'fulfilled') { list.push(...a.value.list); state.rbDone = a.value.done; } else state.rbDone = true;
       if (b.status === 'fulfilled') { list.push(...b.value.list); state.iaDone = b.value.done; } else state.iaDone = true;
-      if (a.status === 'rejected' && b.status === 'rejected') throw a.reason;
-      state.done = state.rbDone && state.iaDone;
+      if (k.status === 'fulfilled') { list.push(...k.value.list); state.bkDone = k.value.done; } else state.bkDone = true;
+      if ([a, b, k].every(x => x.status === 'rejected')) throw a.reason;
+      state.done = state.rbDone && state.iaDone && state.bkDone;
     } else {
-      const r = c.src === 'rb' ? await rbSearch({by: c.by, page: state.page}) : await iaSearch({q: '', page: state.page, artist: c.artist});
+      const r = c.src === 'rb' ? await rbSearch({by: c.by, page: state.page}) : await iaSearch({q: '', page: state.page, artist: c.artist, kind: c.kind, lang: c.lang});
       list = r.list; state.done = r.done;
       if (c.id === 'konsertit') {   // enintään 3 keikkaa samalta esittäjältä, jotta lista on monipuolinen
         const n = state.perBand || (state.perBand = {});
@@ -289,7 +306,7 @@ async function load() {
 
 function show(catId) {
   let c;
-  if (catId === 'haku') c = {id:'haku', name:`Haku: ${state.q}`, sub:'Radioasemat nimen mukaan ja konsertit Live Music Archivesta.'};
+  if (catId === 'haku') c = {id:'haku', name:`Haku: ${state.q}`, sub:'Radioasemat, konsertit ja äänikirjat.'};
   else if (catId === 'esittajat') c = {id:'esittajat', tab:'konsertit', sub2:'esittajat', src:'artists', name:'Esittäjät', sub:'Live Music Archiven 3000 suosituinta esittäjää aakkosjärjestyksessä.'};
   else if (catId.startsWith('esittaja=')) {
     const id = decodeURIComponent(catId.slice(9));
@@ -298,9 +315,11 @@ function show(catId) {
     if (!known) fetch(`${IA}/metadata/${encodeURIComponent(id)}/metadata/title`).then(r => r.json()).then(j => {
       if (state.cat?.artist === id && j.result) $('#heading').textContent = plain(j.result);
     }).catch(() => {});
-  } else c = CATS.find(x => x.id === catId) || CATS[0];
+  } else if (catId === 'aanikirjat-suomi') c = {id:catId, tab:'aanikirjat', src:'ia', kind:'book', lang:'fin', name:'Äänikirjat suomeksi', sub:'Suomenkieliset LibriVox-äänikirjat, esimerkiksi Aleksis Kiveä ja Juhani Ahoa.'};
+  else c = CATS.find(x => x.id === catId) || CATS[0];
   if (c.id === 'konsertit') c = {...c, sub2:'konsertit'};
-  state = {...state, cat: c, page: 0, done: false, busy: false, rbDone: false, iaDone: false, perBand: null, token: state.token + 1};
+  if (c.tab === 'aanikirjat' || c.id === 'aanikirjat') c = {...c, sub2: c.id};
+  state = {...state, cat: c, page: 0, done: false, busy: false, rbDone: false, iaDone: false, bkDone: false, perBand: null, token: state.token + 1};
   document.querySelectorAll('#tabs a').forEach(a => {
     if (a.dataset.id === (c.tab || c.id)) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   });
@@ -309,7 +328,11 @@ function show(catId) {
   if (links) return;
   $('#heading').textContent = c.name; $('#sub').textContent = c.sub || '';
   const sn = $('#subnav'); sn.hidden = !c.sub2;
-  sn.querySelectorAll('a').forEach(a => { if (a.dataset.id === c.sub2) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  if (c.sub2) {
+    const links = (c.tab || c.id) === 'aanikirjat' ? [['aanikirjat', 'Suosituimmat'], ['aanikirjat-suomi', 'Suomeksi']] : [['konsertit', 'Suosituimmat'], ['esittajat', 'Esittäjät A–Ö']];
+    sn.innerHTML = links.map(([id, t]) => `<a href="#${id}" data-id="${id}"${id === c.sub2 ? ' aria-current="page"' : ''}>${t}</a>`).join('');
+  }
+  if ((c.tab || c.id) === 'aanikirjat') renderProgress(); else $('#progress').hidden = true;
   $('#artists').hidden = true; grid.hidden = false;
   $('#random').hidden = c.src !== 'rb';
   if (c.id === 'suomi') renderRecent(); else $('#recent').hidden = true;
@@ -317,13 +340,14 @@ function show(catId) {
   grid.replaceChildren(); statusEl.textContent = ''; moreBtn.hidden = true;
   if (c.src === 'fav') {
     const f = store.get(); state.done = true;
-    for (const [src, title] of [['rb', 'Radioasemat'], ['ia', 'Konsertit']]) {
-      const list = f.filter(x => x.src === src);
+    const group = x => x.src === 'rb' ? 'rb' : x.kind === 'book' ? 'book' : 'live';
+    for (const [src, title] of [['rb', 'Radioasemat'], ['live', 'Konsertit'], ['book', 'Äänikirjat']]) {
+      const list = f.filter(x => group(x) === src);
       const h = document.createElement('h2'); h.className = 'ghead';
       h.textContent = `${title} (${list.length})`;
       grid.append(h);
       if (list.length) addCards(list);
-      else { const e = document.createElement('p'); e.className = 'gempty'; e.textContent = src === 'rb' ? 'Ei vielä suosikkiasemia. Paina tähteä aseman kortissa.' : 'Ei vielä suosikkikonsertteja. Paina tähteä konsertin kortissa.'; grid.append(e); }
+      else { const e = document.createElement('p'); e.className = 'gempty'; e.textContent = src === 'rb' ? 'Ei vielä suosikkiasemia. Paina tähteä aseman kortissa.' : (src === 'live' ? 'Ei vielä suosikkikonsertteja. Paina tähteä konsertin kortissa.' : 'Ei vielä suosikkiäänikirjoja. Paina tähteä kirjan kortissa.'); grid.append(e); }
     }
     return;
   }
@@ -332,7 +356,7 @@ function show(catId) {
 
 // ---------- player ----------
 const audio = $('#audio'), bar = $('#player'), toggle = $('#ptoggle'), pfav = $('#pfav');
-const prevBtn = $('#pprev'), nextBtn = $('#pnext'), timerBtn = $('#ptimer'), vol = $('#pvol');
+const speedBtn = $('#pspeed'), prevBtn = $('#pprev'), nextBtn = $('#pnext'), timerBtn = $('#ptimer'), vol = $('#pvol');
 let now = null, queue = [], qi = 0;
 const ms = 'mediaSession' in navigator ? navigator.mediaSession : null;
 
@@ -372,13 +396,17 @@ function play(item, title, url, sub) {
 
 function playStation(it) {
   queue = []; play(it, it.title, it.url, 'Radio');
+  setSpeed(1); speedBtn.hidden = true;
   rb(`/json/url/${it.id}`, {}).catch(() => {});      // Radio Browserin kuuntelulaskuri
   startNowPlaying(it);
 }
-function playTrack(album, i) {
+function playTrack(album, i, startAt = 0) {
   stopNowPlaying();
   qi = i; const t = queue[i];
+  if (startAt > 5) audio.addEventListener('loadedmetadata', () => { audio.currentTime = startAt; }, {once: true});
   play(album, t.title, t.url, album.title);
+  setSpeed(album.kind === 'book' ? speed : 1);
+  speedBtn.hidden = album.kind !== 'book';
   document.querySelectorAll('#tracks li').forEach((li, n) => li.classList.toggle('on', n === i));
 }
 function step(d) {
@@ -396,7 +424,10 @@ audio.addEventListener('playing', () => {
 audio.addEventListener('pause', () => { bar.classList.add('paused'); toggle.textContent = '▶'; toggle.setAttribute('aria-label', 'Toista'); });
 audio.addEventListener('waiting', () => setState('Puskuroidaan…'));
 audio.addEventListener('error', () => { if (audio.src) setState('Lähetys ei toistu nyt. Kokeile toista asemaa.'); });
-audio.addEventListener('ended', () => { if (queue.length && qi + 1 < queue.length) playTrack(now.item, qi + 1); });
+audio.addEventListener('ended', () => {
+  if (queue.length && qi + 1 < queue.length) playTrack(now.item, qi + 1);
+  else if (now?.item.kind === 'book') { const p = pos.get(); delete p[now.item.key]; pos.set(p); }   // kirja kuunneltu loppuun
+});
 const resume = () => {
   if (!queue.length && now) audio.src = now.item.url;   // radio: palaa suoraan lähetykseen
   audio.play().catch(() => setState('Ei toistu.'));
@@ -488,6 +519,41 @@ $('#random').addEventListener('click', () => {
   if (it) playStation(it);
 });
 
+// ---------- äänikirjojen kohta ja nopeus ----------
+const pos = {
+  get(){ try { return JSON.parse(localStorage.getItem('muzak-pos') || '{}'); } catch { return {}; } },
+  set(v){ try { localStorage.setItem('muzak-pos', JSON.stringify(v)); } catch {} }
+};
+let lastSave = 0;
+function savePos() {
+  if (!now || now.item.kind !== 'book' || !queue.length || !audio.currentTime) return;
+  const p = pos.get();
+  p[now.item.key] = {i: qi, t: Math.floor(audio.currentTime), n: queue.length, ch: queue[qi].title, at: Date.now(), item: now.item};
+  pos.set(p); lastSave = Date.now();
+}
+audio.addEventListener('timeupdate', () => { if (Date.now() - lastSave > 5000) savePos(); });
+audio.addEventListener('pause', savePos);
+window.addEventListener('pagehide', savePos);
+const clock = s => { s = Math.floor(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`; };
+function renderProgress() {
+  const list = Object.values(pos.get()).sort((a, b) => b.at - a.at).slice(0, 12);
+  $('#progress').hidden = !list.length;
+  $('#progressrow').replaceChildren(...list.map(p => card({...p.item, meta: `Luku ${p.i + 1}/${p.n} · ${clock(p.t)}`})));
+}
+$('#progressrow').addEventListener('click', e => onCardClick(e));
+
+const SPEEDS = [1, 1.25, 1.5, 2, 0.75];
+let speed = +localStorage.getItem('muzak-speed') || 1;
+function setSpeed(v) {
+  audio.defaultPlaybackRate = audio.playbackRate = v;
+  speedBtn.textContent = `${v}×`; speedBtn.setAttribute('aria-label', `Toistonopeus ${v}×`);
+}
+speedBtn.addEventListener('click', () => {
+  speed = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length];
+  try { localStorage.setItem('muzak-speed', speed); } catch {}
+  setSpeed(speed);
+});
+
 // ---------- album sheet ----------
 const dlg = $('#album'), afav = $('#afav');
 let openAlbum = null, albumTracks = [];
@@ -503,25 +569,34 @@ async function showAlbum(it) {
   const wait = document.createElement('li'); wait.textContent = 'Ladataan kappaleita…'; ol.append(wait);
   setAlbumFav(); dlg.showModal();
   try {
-    const {meta, tracks} = await iaTracks(it.id);
+    const {meta, tracks} = await iaTracks(it.id, it.kind);
     if (openAlbum !== it) return;
     albumTracks = tracks;
     const lic = meta.licenseurl ? ` · Lisenssi: ${meta.licenseurl.replace(/^https?:\/\/(www\.)?/, '')}` : '';
     $('#ameta').textContent = (it.meta || '') + lic;
-    if (it.artistId) {
+    if (it.artistId && it.kind !== 'book') {
       const a = document.createElement('a');
       a.href = '#esittaja=' + encodeURIComponent(it.artistId); a.textContent = `Kaikki ${it.artist || 'esittäjän'} -konsertit`;
       $('#ameta').append(' · ', a);
     }
+    const saved = it.kind === 'book' ? pos.get()[it.key] : null;
     ol.replaceChildren(...tracks.map((t, i) => {
       const li = document.createElement('li');
+      if (saved && saved.i === i) li.classList.add('saved');
       const b = document.createElement('button'); b.type = 'button'; b.className = 'track';
       b.innerHTML = '<span class="tt"></span><span class="tl"></span>';
       b.querySelector('.tt').textContent = t.title; b.querySelector('.tl').textContent = fmt(t.len);
       b.addEventListener('click', () => { queue = albumTracks; playTrack(it, i); });
       li.append(b); return li;
     }));
-    if (!tracks.length) ol.innerHTML = '<li>Tästä konsertista ei löytynyt soitettavia kappaleita.</li>';
+    if (saved && saved.i < tracks.length) {
+      const li = document.createElement('li'); li.className = 'resume';
+      const b = document.createElement('button'); b.type = 'button';
+      b.textContent = `▶ Jatka kohdasta: ${tracks[saved.i].title} · ${clock(saved.t)}`;
+      b.addEventListener('click', () => { queue = albumTracks; playTrack(it, saved.i, saved.t); });
+      li.append(b); ol.prepend(li);
+    }
+    if (!tracks.length) ol.innerHTML = `<li>Tästä ${it.kind === 'book' ? 'kirjasta' : 'konsertista'} ei löytynyt soitettavia kappaleita.</li>`;
   } catch { ol.innerHTML = '<li>Kappaleiden lataus epäonnistui. Yritä uudelleen.</li>'; }
 }
 $('#aclose').addEventListener('click', () => dlg.close());

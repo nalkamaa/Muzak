@@ -138,3 +138,8 @@ dialog button.ghost{color:#2a1a0c;border-color:#8a6a3a}
 .recent{margin:0 0 28px}
 .recent h2{font:400 26px 'DM Serif Display',serif;color:#f3d08a;margin:0 0 10px}
 .recentrow{display:grid;grid-auto-flow:column;grid-auto-columns:150px;gap:14px;overflow-x:auto;padding-bottom:8px;scrollbar-width:thin}
+
+/* audiobooks */
+.card.book .cover img{object-fit:cover}
+.tracks li.resume button{width:100%;margin:6px 0 10px;text-align:left;padding:0 14px}
+.tracks li.saved .tt::after{content:"  ● kesken";color:#b5621a;font-size:13px;font-weight:600}
