@@ -12,13 +12,14 @@ const CATS = [
   {id:'elektroninen', name:'Elektroninen', src:'rb', by:{tag:'electronic'}, sub:'Elektronista musiikkia soittavia asemia.'},
   {id:'blues', name:'Blues', src:'rb', by:{tag:'blues'}, sub:'Blues-radioasemia ympäri maailmaa.'},
   {id:'klassinen', name:'Klassinen', src:'rb', by:{tag:'classical'}, sub:'Klassisen musiikin radioasemia.'},
+  {id:'joulu', name:'Joulu', src:'rb', by:{multi:[{tag:'joulumusiikki'}, {name:'joulu'}, {tag:'christmas'}, {tag:'christmas music'}, {tag:'xmas'}, {tag:'weihnachten'}]}, sub:'Joulumusiikkia soittavia asemia, suomalaiset ensin.'},
   {id:'albumit', name:'Albumit', src:'ia', sub:'Vapaasti jaettavia albumeita Internet Archiven netlabel-kokoelmasta, suosituimmat ensin.'},
   {id:'suosikit', name:'Suosikit', src:'fav', sub:'Tallentamasi asemat ja albumit. Ne säilyvät tässä laitteessa ja selaimessa.'},
   {id:'linkit', name:'Muut palvelut', src:'links'}
 ];
 
 // Hengellinen ja uskonnollinen sisältö sekä puhekanavat suodatetaan pois nimen ja tagien perusteella.
-const SPIRITUAL = /christ|kristi|gospel|worship|church|kirkko|seurakun|bible|raamat|catholic|katoli|evangel|evankel|lutheran|luterilai|jesus|jeesus|\bgod\b|\bgud\b|jumala|praise|prayer|rukous|sermon|saarna|hymn|virsi|virret|psalm|messiah|herätys|hengelli|relig|spiritu|islam|quran|koran|sunnah|allah|nasheed|hindu|bhajan|bhakti|devotion|mantra|krishna|buddh|dharma|torah|jewish|chabad|adventist|pentecost|helluntai|baptist|ministr|faith|\bpray|gurbani|kirtan/i;
+const SPIRITUAL = /christ(?!mas)|kristi|gospel|worship|church|kirkko|seurakun|bible|raamat|catholic|katoli|evangel|evankel|lutheran|luterilai|jesus|jeesus|\bgod\b|\bgud\b|jumala|praise|prayer|rukous|sermon|saarna|hymn|virsi|virret|psalm|messiah|herätys|hengelli|relig|spiritu|islam|quran|koran|sunnah|allah|nasheed|hindu|bhajan|bhakti|devotion|mantra|krishna|buddh|dharma|torah|jewish|chabad|adventist|pentecost|helluntai|baptist|ministr|faith|\bpray|gurbani|kirtan/i;
 // Venäläiset asemat: maa, kieli, tagit tai nimi.
 const RUSSIAN = /russia|russian|русск|росси|\bрф\b/i;
 const TALK = /\b(talk|news|uutiset|sports?|urheilu|podcast)\b/i;
@@ -73,7 +74,19 @@ function okStation(s) {
   return true;
 }
 
+async function rbMulti(multi) {
+  const res = await Promise.allSettled(multi.map(m => rbSearch({by: m.tag ? {tag: m.tag} : {}, q: m.name, page: 0})));
+  const seen = new Set(), list = [];
+  res.forEach(r => r.status === 'fulfilled' && r.value.list.forEach(it => {
+    const k = it.title.toLowerCase(); if (seen.has(it.key) || seen.has(k)) return;
+    seen.add(it.key); seen.add(k); list.push(it);
+  }));
+  if (!list.length && res.every(r => r.status === 'rejected')) throw res[0].reason;
+  return {list, done: true};
+}
+
 async function rbSearch({by, q, page}) {
+  if (by?.multi) return rbMulti(by.multi);
   const fetchN = 100;
   const params = {hidebroken:'true', order:'clickcount', reverse:'true', limit:fetchN, offset:page * fetchN};
   if (by?.countrycode) params.countrycode = by.countrycode;
